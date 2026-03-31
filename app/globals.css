@@ -1,0 +1,44 @@
+@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Scrollbar — glass theme ─────────────────────────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.32);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ── Staggered card reveal ───────────────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.card-reveal {
+  opacity: 0;
+  animation: fadeUp 0.45s ease forwards;
+}
+
+/* ── Admin scrollbar (dark zinc) ─────────────────────────────────────────── */
+.admin-scroll {
+  scrollbar-color: #3f3f46 #18181b;
+}
+.admin-scroll::-webkit-scrollbar-track  { background: #18181b; }
+.admin-scroll::-webkit-scrollbar-thumb  { background: #3f3f46; border-radius: 9999px; }

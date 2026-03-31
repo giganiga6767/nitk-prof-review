@@ -1,0 +1,148 @@
+// prisma/schema.prisma
+// ─────────────────────────────────────────────────────────────────────────────
+// NOTE: The Vote model required for the upvote/downvote system was ALREADY
+// present in this schema. No structural changes were needed.
+//
+// The @@unique([reviewId, hashedVoterId]) constraint is what enforces
+// one-vote-per-user-per-review at the database level.
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+}
+
+// ─── NextAuth v5 adapter models ───────────────────────────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── Domain models ────────────────────────────────────────────────────────────
+
+model Professor {
+  isApproved Boolean @default(false)
+  id            String   @id @default(cuid())
+  name          String
+  department    String
+  designation   String?
+  overallRating Float    @default(0)
+  difficulty    Float    @default(0)
+  status        String   @default("pending") // "active" | "pending"
+  reviews       Review[]
+  createdAt     DateTime @default(now())
+
+  @@index([department])
+  @@index([status])
+}
+
+model Review {
+  isApproved Boolean @default(false)
+  id             String       @id @default(cuid())
+  rating         Int          // 1–5
+  difficulty     Int          // 1–5
+  tags           String[]
+  comment        String
+  status         ReviewStatus @default(PENDING)
+  // SHA-256(AUTH_HASH_SALT + email) — raw email never stored
+  hashedAuthorId String?
+  ipHash         String?
+  createdAt      DateTime     @default(now())
+
+  professor   Professor @relation(fields: [professorId], references: [id], onDelete: Cascade)
+  professorId String
+  votes       Vote[]
+  flags       Flag[]
+
+  @@index([hashedAuthorId])
+  @@index([professorId, hashedAuthorId])
+  @@index([status])
+}
+
+// ★ Community upvote / downvote (one per NITK user per review)
+// @@unique([reviewId, hashedVoterId]) enforces one-vote-per-user at DB level.
+model Vote {
+  id            String   @id @default(cuid())
+  reviewId      String
+  hashedVoterId String   // SHA-256(AUTH_HASH_SALT + voter email)
+  value         Int      // 1 = up | -1 = down
+  createdAt     DateTime @default(now())
+  review        Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewId, hashedVoterId])
+  @@index([reviewId])
+}
+
+// ★ Student-reported review flags
+model Flag {
+  id               String   @id @default(cuid())
+  reviewId         String
+  hashedReporterId String   // SHA-256(AUTH_HASH_SALT + reporter email)
+  reason           String   // free-text reason chosen by reporter
+  createdAt        DateTime @default(now())
+  review           Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  // One flag per user per review — prevents spam flagging
+  @@unique([reviewId, hashedReporterId])
+  @@index([reviewId])
+}
+
+// ★ Permanently banned authors (by hashed email)
+model BannedUser {
+  // Using hashedId as PK directly — cleaner lookups, guaranteed uniqueness
+  hashedId  String   @id
+  reason    String?
+  bannedBy  String?  // admin note
+  createdAt DateTime @default(now())
+}
